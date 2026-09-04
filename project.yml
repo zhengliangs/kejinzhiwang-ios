@@ -1,0 +1,62 @@
+name: KejinZhiWang
+
+options:
+  bundleIdPrefix: com.sharkking
+  deploymentTarget:
+    iOS: "16.0"
+  groupSortPosition: top
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    ENABLE_BITCODE: NO
+    # 打包全程不签名，产出未签名 ipa 交给全能签
+    CODE_SIGNING_ALLOWED: NO
+    CODE_SIGN_IDENTITY: ""
+    CODE_SIGNING_REQUIRED: NO
+    PROVISIONING_PROFILE_SPECIFIER: ""
+    PRODUCT_NAME: KejinZhiWang
+    PRODUCT_BUNDLE_IDENTIFIER: com.sharkking.assistant
+    MARKETING_VERSION: "1.0.99"
+    CURRENT_PROJECT_VERSION: "99"
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    SWIFT_EMIT_LOC_STRINGS: YES
+    EXCLUDED_ARCHS[sdk=iphonesimulator*]: arm64
+
+targets:
+  KejinZhiWang:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+        excludes:
+          - "**/*.md"
+      # 这两个目录必须原样保留层级（游戏按相对路径取资源），
+      # 所以用 folder reference 而不是 group
+      - path: Resources/renderer
+        type: folder
+        buildPhase: resources
+      - path: Resources/scripts
+        type: folder
+        buildPhase: resources
+      - path: Resources/Assets.xcassets
+        buildPhase: resources
+    info:
+      path: Resources/Info.plist
+    settings:
+      base:
+        INFOPLIST_FILE: Resources/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+
+schemes:
+  KejinZhiWang:
+    build:
+      targets:
+        KejinZhiWang: all
+    run:
+      config: Release
+    archive:
+      config: Release

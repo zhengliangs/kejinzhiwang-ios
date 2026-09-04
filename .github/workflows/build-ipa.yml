@@ -1,0 +1,63 @@
+name: Build IPA (unsigned)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    name: Build unsigned IPA
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Archive (no signing)
+        env:
+          BUILD_DIR: ${{ github.workspace }}/build
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project KejinZhiWang.xcodeproj \
+            -scheme KejinZhiWang \
+            -configuration Release \
+            -archivePath "$BUILD_DIR/KejinZhiWang.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            | tee "$BUILD_DIR/build.log"
+          # 归档失败（无 .app 产物）时，打包步骤会报错并回显日志尾部
+
+      - name: Package unsigned IPA
+        env:
+          BUILD_DIR: ${{ github.workspace }}/build
+        run: |
+          APP="$BUILD_DIR/KejinZhiWang.xcarchive/Products/Applications/KejinZhiWang.app"
+          if [ ! -d "$APP" ]; then
+            echo "::error::未在归档产物中找到 .app，打包中止"
+            tail -n 40 "$BUILD_DIR/build.log"
+            exit 1
+          fi
+          mkdir -p "$BUILD_DIR/Payload"
+          cp -R "$APP" "$BUILD_DIR/Payload/KejinZhiWang.app"
+          cd "$BUILD_DIR"
+          zip -r -y KejinZhiWang.ipa Payload
+          echo "IPA 大小：$(du -h KejinZhiWang.ipa | cut -f1)"
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: KejinZhiWang-unsigned-ipa
+          path: build/KejinZhiWang.ipa
+          if-no-files-found: error

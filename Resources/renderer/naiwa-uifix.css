@@ -1,0 +1,35 @@
+/*
+ * 脚本面板显示修正。
+ *
+ * 走 <link> 引入而不是注入 style 标签：注入的样式在脚本自己的 CSS
+ * 之后插入时优先级不稳，而且上一版逐个改元素 style 把面板改塌了。
+ * 这里全部靠选择器命中，不碰任何元素的行内样式。
+ */
+
+/*
+ * 1. 解除 body 的 flex 上下文。
+ *
+ * 游戏页 style-mobile.css 给 body 设了 display:flex; flex-direction:column,
+ * 脚本 appendChild 进来的面板会变成 flex item 被 canvas 挤到画面下方
+ * （白玉彩玉"飞到底下"就是这个）。overflow:hidden 则裁掉超出部分。
+ */
+body {
+  display: block !important;
+  overflow: visible !important;
+}
+
+/* canvas 原本靠 body 的 flex 居中，flex 去掉后自己保持铺满 */
+#GameCanvas,
+#Cocos2dGameContainer {
+  position: absolute !important;
+  left: 0;
+  top: 0;
+}
+
+/*
+ * vh 单位失效的修正在 InjectScripts.VH_FIX 里做（需要遍历样式表，
+ * 纯 CSS 办不到）。这里只保留 body 布局的修正。
+ */
+
+
+

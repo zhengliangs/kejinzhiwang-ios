@@ -1,0 +1,34 @@
+# ===== kejinzhiwang-ios .gitignore =====
+# 真源是 project.yml，.xcodeproj 与 build/ 都是打包时生成的产物，不进仓库。
+
+# ---- XcodeGen 生成物（真源：project.yml）----
+KejinZhiWang.xcodeproj/
+*.xcodeproj/
+
+# ---- 构建产物（xcodebuild archive 输出 .app / .xcarchive / .ipa）----
+build/
+DerivedData/
+*.xcarchive
+*.ipa
+
+# ---- Xcode 用户数据 / 本地状态 ----
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.moved-aside
+
+# ---- Xcode 辅助文件 ----
+*.hmap
+
+# ---- SwiftPM（若以后引入）----
+.build/
+
+# ---- 操作系统 / 编辑器 ----
+.DS_Store
+Thumbs.db
+*.swp
+*~
