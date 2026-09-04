@@ -87,9 +87,10 @@ struct RootView: View {
 
     /// TabBar 的高度（标准 49pt + 底部安全区）
     private var tabBarHeight: CGFloat {
-        49 + UIApplication.shared.connectedScenes
+        let bottom = UIApplication.shared.connectedScenes
             .compactMap { ($0 as? UIWindowScene)?.windows.first?.safeAreaInsets.bottom }
             .first ?? 0
+        return 49 + bottom
     }
 }
 
