@@ -236,7 +236,7 @@ struct GamesView: View {
         if server.baseUrl == nil {
             EmptyHint(text: "HTTP服务器未就绪")
         } else if store.windows.isEmpty {
-            EmptyHint("暂无游戏窗口，去账号页点击账号卡片打开游戏")
+            EmptyHint(text: "暂无游戏窗口，去账号页点击账号卡片打开游戏")
         } else if store.tabMode {
             VStack(spacing: 0) {
                 TabStrip(statuses: pool.statuses)

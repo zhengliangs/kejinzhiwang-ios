@@ -184,7 +184,8 @@ enum BinBuilder {
         roles.enumerated().map { (i, role) in
             // 必须用 LX("pl")：游戏发 authuser 时声明 O4e-Encoding: lx，
             // 给 px 会被判「指令解析错误」，卡在「正在登录」
-            let bytes = XyCrypto.encryptLX(BonEncoder().encode(cred.toBon(role.serverId)))
+            let sid: Int? = role.serverId
+            let bytes = XyCrypto.encryptLX(BonEncoder().encode(cred.toBon(serverId: sid)))
             let safe = bonSafeFileName(role.name)
             let name = String(format: "%02d-%@-%d服-%lld-%@.bin",
                               i + 1, role.powerText(), role.serverId, role.roleId, safe)
