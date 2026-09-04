@@ -34,10 +34,12 @@ final class ImportViewModel: ObservableObject {
     /// 前缀 0..9 区分来源（0=文件选择, 1=读取, 2=解析, 3=网络, 8=VM 内部, 9=未知）。
     @Published var diagLog = ""
 
-    /// 记一条诊断日志：同时写 os_log 和界面缓冲区
+    /// 记一条诊断日志：同时写 os_log + 界面缓冲区 + Documents/import.log
+    /// （Documents 路径在开启 UIFileSharingEnabled 后，用户能从「文件 App」看到）
     func diag(_ s: String) {
         Log.importer(s)
         if diagLog.count < 4000 { diagLog += s + "\n" }
+        LogFile.append(s)
     }
 
     func clearDiag() { diagLog = "" }

@@ -58,5 +58,12 @@
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>
 	</dict>
+	<!-- 开启 iTunes/Files 文件共享：让用户在「文件 App → 我的 iPhone」看到这个 App 目录
+	     可以手动把 bin 拷进去。然后用 App 内的「浏览 App 目录」按钮读取，
+     彻底避开 SwiftUI fileImporter 在 sideloaded App 上回调丢失的已知 bug -->
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 </dict>
 </plist>

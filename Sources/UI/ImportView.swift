@@ -28,6 +28,8 @@ struct ImportView: View {
     @State private var showDirectPicker = false
 
     var body: some View {
+        // 用 UIScreen.main.bounds 强制固定全屏尺寸，绕开 fullScreenCover 在
+        // 某些 iOS 版本下把容器限制为父视图可见区导致「悬浮中间 + 底部留黑」的渲染问题
         NavigationStack {
             content
                 .navigationTitle("导入账号")
@@ -41,9 +43,9 @@ struct ImportView: View {
                 }
         }
         .tint(palette.primary)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
         .background(palette.background.ignoresSafeArea())
-        .ignoresSafeArea(.keyboard)
+        .ignoresSafeArea()
     }
 
     @ViewBuilder
@@ -112,7 +114,8 @@ struct ImportView: View {
             case .scan: ScanPane(vm: vm)
             case .sms: SmsPane(vm: vm)
             case .bin: BinPane(vm: vm, showQueryPicker: $showQueryPicker,
-                               showDirectPicker: $showDirectPicker)
+                               showDirectPicker: $showDirectPicker,
+                               onImported: { imported = $0 })
             }
         }
         .background(palette.background)
@@ -296,8 +299,14 @@ private struct BinPane: View {
     @ObservedObject var vm: ImportViewModel
     @Binding var showQueryPicker: Bool
     @Binding var showDirectPicker: Bool
+    /// 父组件传进来的「成功导入 N 个」回调
+    var onImported: (Int) -> Void
 
     @Environment(\.palette) private var palette
+    @EnvironmentObject private var store: AppStore
+
+    @State private var showLocalQueryPicker = false
+    @State private var showLocalDirectPicker = false
 
     var body: some View {
         VStack(spacing: 10) {
@@ -329,11 +338,52 @@ private struct BinPane: View {
                 .font(.caption)
                 .foregroundStyle(palette.onSurfaceVariant)
 
+            // —— 绕开系统 picker 的内置 bin 选择器（关键） ——
+            Spacer().frame(height: 18)
+            Divider()
+            Spacer().frame(height: 14)
+
+            Button {
+                vm.diag("[0] 打开本地 bin 选择器（单选）")
+                showLocalQueryPicker = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "folder.fill")
+                    Text("从 App 目录选 bin（推荐）")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(vm.busy)
+
+            Button {
+                vm.diag("[0] 打开本地 bin 选择器（多选）")
+                showLocalDirectPicker = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "folder.fill.badge.plus")
+                    Text("从 App 目录批量选 bin")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(vm.busy)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("推荐用这个入口：")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(palette.onSurfaceVariant)
+                Text("iPhone → 文件 App → 我的 iPhone → 氪金之王，把 bin 拷进去或保存到这里，再回 App 选。完全不走系统 picker，不存在回调丢失。")
+                    .font(.caption2)
+                    .foregroundStyle(palette.onSurfaceVariant.opacity(0.85))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
             // —— 诊断日志：界面上直接显示每一步，方便截图反馈问题 ——
             if !vm.diagLog.isEmpty {
                 Divider()
                 HStack {
-                    Text("操作日志")
+                    Text("操作日志（也写入 import.log）")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(palette.onSurfaceVariant)
                     Spacer()
@@ -348,7 +398,7 @@ private struct BinPane: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
                 }
-                .frame(maxWidth: .infinity, maxHeight: 110)
+                .frame(maxWidth: .infinity, maxHeight: 140)
                 .background(palette.surface.opacity(0.6))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             }
@@ -357,6 +407,48 @@ private struct BinPane: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // 内置 picker：单选（反查）
+        .sheet(isPresented: $showLocalQueryPicker) {
+            LocalBinPicker(title: "选一个 bin", multiSelect: false) { picked in
+                guard let file = picked.first else { return }
+                vm.diag("[0] 本地选择: " + file.url.lastPathComponent)
+                loadAndQuery(file.url)
+            }
+        }
+        // 内置 picker：多选（直接导入）
+        .sheet(isPresented: $showLocalDirectPicker) {
+            LocalBinPicker(title: "选 bin 文件（可多选）", multiSelect: true) { picked in
+                vm.diag("[0] 本地批量选择: " + String(picked.count) + " 个")
+                var n = 0
+                for file in picked {
+                    guard let data = try? Data(contentsOf: file.url) else {
+                        vm.diag("[1] 读取失败: " + file.url.lastPathComponent)
+                        continue
+                    }
+                    vm.diag("[1] 读取字节=" + String(data.count) + " " + file.url.lastPathComponent)
+                    store.addAccount(name: file.url.lastPathComponent, data: data)
+                    n += 1
+                }
+                vm.diag("[0] 成功导入=" + String(n))
+                if n > 0 { onImported(n) } else { vm.message = "文件读取失败" }
+            }
+        }
+    }
+
+    private func loadAndQuery(_ url: URL) {
+        vm.diag("[0] 本地单选回调: " + url.lastPathComponent)
+        do {
+            let data = try Data(contentsOf: url)
+            vm.diag("[1] 读取字节数=" + String(data.count))
+            guard !data.isEmpty else {
+                vm.message = "文件为空"
+                return
+            }
+            vm.queryFromBin(data)
+        } catch {
+            vm.diag("[1] 读取失败: " + error.localizedDescription)
+            vm.message = "文件读取失败：" + error.localizedDescription
+        }
     }
 }
 
