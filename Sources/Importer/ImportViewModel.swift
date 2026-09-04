@@ -30,6 +30,18 @@ final class ImportViewModel: ObservableObject {
     /// 勾选状态
     @Published var selected: Set<Int> = []
 
+    /// 诊断日志：界面直接显示，方便不连 Mac 也能看到问题出在哪一步。
+    /// 前缀 0..9 区分来源（0=文件选择, 1=读取, 2=解析, 3=网络, 8=VM 内部, 9=未知）。
+    @Published var diagLog = ""
+
+    /// 记一条诊断日志：同时写 os_log 和界面缓冲区
+    func diag(_ s: String) {
+        Log.importer(s)
+        if diagLog.count < 4000 { diagLog += s + "\n" }
+    }
+
+    func clearDiag() { diagLog = "" }
+
     private var credential: BinBuilder.Credential?
     private var pollTask: Task<Void, Never>?
     private var countdownTask: Task<Void, Never>?
@@ -45,6 +57,7 @@ final class ImportViewModel: ObservableObject {
         selected = []
         credential = nil
         busy = false
+        clearDiag()
     }
 
     // MARK: - 扫码
@@ -219,8 +232,11 @@ final class ImportViewModel: ObservableObject {
         stage = .querying
         Task.detached(priority: .userInitiated) { [weak self] in
             do {
+                await MainActor.run { self?.diag("[2] 开始解析 bin，字节数=\(data.count)") }
                 let cred = try BinBuilder.parseCredential(data.hexBytes)
+                await MainActor.run { self?.diag("[2] bin 解析成功，开始查区服") }
                 let list = try BinBuilder.queryRoles(cred)
+                await MainActor.run { self?.diag("[2] 查询到 \(list.count) 个角色") }
                 await MainActor.run {
                     guard let self else { return }
                     self.credential = cred
@@ -231,6 +247,8 @@ final class ImportViewModel: ObservableObject {
                     self.busy = false
                 }
             } catch {
+                let e = error.localizedDescription
+                await MainActor.run { self?.diag("[2] 失败: " + e) }
                 await MainActor.run {
                     guard let self else { return }
                     self.stage = .idle

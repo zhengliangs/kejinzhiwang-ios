@@ -82,11 +82,21 @@ struct ImportView: View {
 
     private var formPane: some View {
         VStack(spacing: 0) {
+            // 版本号常驻，方便确认测试的是不是最新包
+            Text("v" + (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"))
+                .font(.caption2)
+                .foregroundStyle(palette.onSurfaceVariant.opacity(0.7))
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+
             Picker("方式", selection: $method) {
                 ForEach(Method.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
-            .padding(16)
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+            .padding(.bottom, 12)
             .onChange(of: method) { _ in vm.reset() }
 
             if !vm.message.isEmpty {
@@ -113,30 +123,30 @@ struct ImportView: View {
             // SwiftUI fileImporter 回调永远是 [URL]（无论是否多选），取首个
             switch result {
             case .success(let urls):
-                Log.importer("[fileImporter-query] success, urls.count=" + String(urls.count))
+                vm.diag("[0] 文件选择回调触发，urls=" + String(urls.count))
                 guard let url = urls.first else {
-                    Log.importer("[fileImporter-query] urls 为空")
+                    vm.diag("[0] 回调触发了但 urls 为空")
                     vm.message = "未选择文件"
                     return
                 }
-                Log.importer("[fileImporter-query] 选中 url=" + url.absoluteString)
+                vm.diag("[0] 选中: " + url.lastPathComponent)
                 let accessed = url.startAccessingSecurityScopedResource()
-                Log.importer("[fileImporter-query] startAccessing=" + String(accessed))
+                vm.diag("[0] 安全访问授权=" + String(accessed))
                 defer { if accessed { url.stopAccessingSecurityScopedResource() } }
                 do {
                     let data = try Data(contentsOf: url)
-                    Log.importer("[fileImporter-query] 读取字节数=" + String(data.count))
+                    vm.diag("[1] 读取字节数=" + String(data.count))
                     guard !data.isEmpty else {
                         vm.message = "文件为空"
                         return
                     }
                     vm.queryFromBin(data)
                 } catch {
-                    Log.importer("[fileImporter-query] 读取失败: " + error.localizedDescription)
+                    vm.diag("[1] 读取失败: " + error.localizedDescription)
                     vm.message = "文件读取失败：" + error.localizedDescription
                 }
             case .failure(let err):
-                Log.importer("[fileImporter-query] 用户取消/失败: " + err.localizedDescription)
+                vm.diag("[0] 用户取消或系统拒绝: " + err.localizedDescription)
                 vm.message = "未选择文件：" + err.localizedDescription
             }
         }
@@ -145,33 +155,33 @@ struct ImportView: View {
                       allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls) where !urls.isEmpty:
-                Log.importer("[fileImporter-direct] success, urls.count=" + String(urls.count))
+                vm.diag("[0] 文件选择回调触发（直接导入），urls=" + String(urls.count))
                 var n = 0
                 for url in urls {
-                    Log.importer("[fileImporter-direct] 处理 url=" + url.lastPathComponent)
+                    vm.diag("[0] 处理: " + url.lastPathComponent)
                     let accessed = url.startAccessingSecurityScopedResource()
-                    Log.importer("[fileImporter-direct] startAccessing=" + String(accessed))
+                    vm.diag("[0] 安全访问授权=" + String(accessed))
                     defer { if accessed { url.stopAccessingSecurityScopedResource() } }
                     guard url.lastPathComponent.lowercased().hasSuffix(".bin") else {
-                        Log.importer("[fileImporter-direct] 跳过非 .bin: " + url.lastPathComponent)
+                        vm.diag("[1] 跳过非 .bin: " + url.lastPathComponent)
                         continue
                     }
                     do {
                         let data = try Data(contentsOf: url)
-                        Log.importer("[fileImporter-direct] 读取字节=" + String(data.count))
+                        vm.diag("[1] 读取字节=" + String(data.count))
                         store.addAccount(name: url.lastPathComponent, data: data)
                         n += 1
                     } catch {
-                        Log.importer("[fileImporter-direct] 读取失败: " + error.localizedDescription)
+                        vm.diag("[1] 读取失败: " + error.localizedDescription)
                     }
                 }
-                Log.importer("[fileImporter-direct] 成功导入=" + String(n))
+                vm.diag("[0] 成功导入=" + String(n))
                 if n > 0 { imported = n } else { vm.message = "文件读取失败" }
             case .success(let urls):
-                Log.importer("[fileImporter-direct] success 但未选 urls")
+                vm.diag("[0] 成功但未选到文件")
                 vm.message = "没有选择文件"
             case .failure(let err):
-                Log.importer("[fileImporter-direct] 取消/失败: " + err.localizedDescription)
+                vm.diag("[0] 用户取消或系统拒绝: " + err.localizedDescription)
                 vm.message = "没有选择文件"
             }
         }
@@ -318,6 +328,30 @@ private struct BinPane: View {
             Text("不查区服，原样导入。适合手上已经有一批区服 bin 的情况。")
                 .font(.caption)
                 .foregroundStyle(palette.onSurfaceVariant)
+
+            // —— 诊断日志：界面上直接显示每一步，方便截图反馈问题 ——
+            if !vm.diagLog.isEmpty {
+                Divider()
+                HStack {
+                    Text("操作日志")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(palette.onSurfaceVariant)
+                    Spacer()
+                    Button("清空") { vm.clearDiag() }
+                        .font(.caption2)
+                        .foregroundStyle(palette.primary)
+                }
+                ScrollView {
+                    Text(vm.diagLog)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(palette.onSurface)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                }
+                .frame(maxWidth: .infinity, maxHeight: 110)
+                .background(palette.surface.opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
 
             Spacer()
         }
