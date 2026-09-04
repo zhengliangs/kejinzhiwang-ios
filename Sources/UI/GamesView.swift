@@ -234,7 +234,7 @@ struct GamesView: View {
     @ViewBuilder
     private var content: some View {
         if server.baseUrl == nil {
-            EmptyHint("HTTP服务器未就绪")
+            EmptyHint(text: "HTTP服务器未就绪")
         } else if store.windows.isEmpty {
             EmptyHint("暂无游戏窗口，去账号页点击账号卡片打开游戏")
         } else if store.tabMode {

@@ -105,8 +105,7 @@ struct ImportView: View {
         .fileImporter(isPresented: $showQueryPicker,
                       allowedContentTypes: [.item]) { result in
             switch result {
-            case .success(let urls):
-                guard let url = urls.first else { return }
+            case .success(let url):
                 let accessed = url.startAccessingSecurityScopedResource()
                 defer { if accessed { url.stopAccessingSecurityScopedResource() } }
                 guard let data = try? Data(contentsOf: url), !data.isEmpty else {

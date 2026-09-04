@@ -105,7 +105,7 @@ enum BinBuilder {
 
     /// 查询该凭据在哪些区服有角色
     static func queryRoles(_ cred: Credential) throws -> [RoleInfo] {
-        let payload = XyCrypto.encryptX(BonEncoder().encode(cred.toBon(nil)))
+        let payload = XyCrypto.encryptX(BonEncoder().encode(cred.toBon(serverId: nil)))
         let res = try Http.post(
             XyEndpoints.serverList(),
             headers: [

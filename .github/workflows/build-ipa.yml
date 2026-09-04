@@ -27,10 +27,12 @@ jobs:
           BUILD_DIR: ${{ github.workspace }}/build
         run: |
           set -o pipefail
+          mkdir -p "$BUILD_DIR"
           xcodebuild archive \
             -project KejinZhiWang.xcodeproj \
             -scheme KejinZhiWang \
             -configuration Release \
+            -destination 'generic/platform=iOS' \
             -archivePath "$BUILD_DIR/KejinZhiWang.xcarchive" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \

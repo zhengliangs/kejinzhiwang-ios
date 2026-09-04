@@ -101,16 +101,18 @@ enum XyCrypto {
         for i in 2..<n { frame[i] ^= k }
         frame[0] = 0x70
         frame[1] = 0x6C
-        frame[2] = UInt8((0xAA & Int(frame[2])) |
-            (((key >> 7) & 1) << 6) |
-            (((key >> 6) & 1) << 4) |
-            (((key >> 5) & 1) << 2) |
-            (((key >> 4) & 1) << 0))
-        frame[3] = UInt8((0xAA & Int(frame[3])) |
-            (((key >> 3) & 1) << 6) |
-            (((key >> 2) & 1) << 4) |
-            (((key >> 1) & 1) << 2) |
-            (((key >> 0) & 1) << 0))
+        let f2 = (0xAA & Int(frame[2]))
+            | (((key >> 7) & 1) << 6)
+            | (((key >> 6) & 1) << 4)
+            | (((key >> 5) & 1) << 2)
+            | (((key >> 4) & 1) << 0)
+        frame[2] = UInt8(truncatingIfNeeded: f2)
+        let f3 = (0xAA & Int(frame[3]))
+            | (((key >> 3) & 1) << 6)
+            | (((key >> 2) & 1) << 4)
+            | (((key >> 1) & 1) << 2)
+            | (((key >> 0) & 1) << 0)
+        frame[3] = UInt8(truncatingIfNeeded: f3)
         return frame
     }
 

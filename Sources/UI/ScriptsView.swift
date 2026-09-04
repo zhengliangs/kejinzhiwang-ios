@@ -157,7 +157,7 @@ private struct ScriptRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .onTapGesture(enabled: !script.locked, perform: onTap)
+            .onTapGesture { if !script.locked { onTap() } }
 
             Toggle("", isOn: Binding(
                 get: { script.enabled },

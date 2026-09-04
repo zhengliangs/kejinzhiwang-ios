@@ -347,7 +347,7 @@ final class DeviceInfo {
         o.put("hortorSDKVersion", XyEndpoints.hortorSDKVersion)
         o.put("model", model)
         o.put("brand", brand)
-        return o.toJsonString()
+        return try? o.toJsonString() ?? ""
     }
 
     /// iOS 模板，登录用。字段顺序照抓包明文
@@ -357,7 +357,7 @@ final class DeviceInfo {
         o.put("model", iosModel)
         o.put("brand", "Apple")
         o.put("hortorSDKVersion", XyEndpoints.iosSDKVersion)
-        return o.toJsonString()
+        return try? o.toJsonString() ?? ""
     }
 
     /// iOS 端的设备指纹集合，服务端用来做同设备判定
