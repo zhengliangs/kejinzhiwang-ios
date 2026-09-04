@@ -110,8 +110,13 @@ struct ImportView: View {
                       // [.data] 让系统显示全部文件，.item 作兜底
                       allowedContentTypes: [.data, .item],
                       allowsMultipleSelection: false) { result in
+            // SwiftUI fileImporter 回调永远是 [URL]（无论是否多选），取首个
             switch result {
-            case .success(let url):
+            case .success(let urls):
+                guard let url = urls.first else {
+                    vm.message = "未选择文件"
+                    return
+                }
                 let accessed = url.startAccessingSecurityScopedResource()
                 defer { if accessed { url.stopAccessingSecurityScopedResource() } }
                 guard let data = try? Data(contentsOf: url), !data.isEmpty else {
@@ -119,8 +124,8 @@ struct ImportView: View {
                     return
                 }
                 vm.queryFromBin(data)
-            case .failure:
-                vm.message = "文件读取失败"
+            case .failure(let err):
+                vm.message = "未选择文件：" + err.localizedDescription
             }
         }
         .fileImporter(isPresented: $showDirectPicker,
