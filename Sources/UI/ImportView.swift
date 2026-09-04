@@ -33,13 +33,17 @@ struct ImportView: View {
                 .navigationTitle("导入账号")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("关闭") { onClose() }
+                    // 关闭按钮放在 navigationBarTrailing（右上），避免与下方 Picker 重叠
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("关闭", action: onClose)
+                            .font(.subheadline.weight(.medium))
                     }
                 }
         }
         .tint(palette.primary)
-        .background(palette.background)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(palette.background.ignoresSafeArea())
+        .ignoresSafeArea(.keyboard)
     }
 
     @ViewBuilder
@@ -103,7 +107,9 @@ struct ImportView: View {
         }
         .background(palette.background)
         .fileImporter(isPresented: $showQueryPicker,
-                      allowedContentTypes: [.item]) { result in
+                      // [.data] 让系统显示全部文件，.item 作兜底
+                      allowedContentTypes: [.data, .item],
+                      allowsMultipleSelection: false) { result in
             switch result {
             case .success(let url):
                 let accessed = url.startAccessingSecurityScopedResource()
@@ -118,7 +124,7 @@ struct ImportView: View {
             }
         }
         .fileImporter(isPresented: $showDirectPicker,
-                      allowedContentTypes: [.item],
+                      allowedContentTypes: [.data, .item],
                       allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls) where !urls.isEmpty:
@@ -351,3 +357,4 @@ private struct RolePicker: View {
         }
     }
 }
+

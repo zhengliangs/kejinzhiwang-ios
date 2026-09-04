@@ -18,8 +18,6 @@ struct RootView: View {
 
     @State private var tab: AppTab = .accounts
     @State private var showImport = false
-    // 每次启动都提示，避免被二次分发者拿去收费
-    @State private var showNotice = true
     @State private var update: ReleaseInfo?
 
     var body: some View {
@@ -65,20 +63,13 @@ struct RootView: View {
                 .environmentObject(store)
                 .environment(\.palette, store.darkTheme ? .dark : .light)
         }
-        .sheet(isPresented: $showNotice) {
-            FreeNoticeSheet { showNotice = false }
-                .interactiveDismissDisabled(true)
-        }
         .sheet(item: $update) { info in
             UpdateSheet(info: info)
         }
-        // 免费声明确认后再查更新，两个弹窗不会叠在一起
-        .onChange(of: showNotice) { showing in
-            if showing { return }
-            Task {
-                if case .available(let info) = await UpdateChecker.check() {
-                    await MainActor.run { update = info }
-                }
+        // 启动后查一次更新
+        .task {
+            if case .available(let info) = await UpdateChecker.check() {
+                update = info
             }
         }
     }
@@ -86,48 +77,6 @@ struct RootView: View {
     /// 给底栏让出的高度（标准 49pt + 安全区）
     private func bottomInset(_ geo: GeometryProxy) -> CGFloat {
         49 + geo.safeAreaInsets.bottom
-    }
-}
-
-// MARK: - 免费声明
-
-/**
- * 只能点「我知道了」关闭：点外部或返回键都不消失，
- * 确保用户真的看到这段话。
- */
-private struct FreeNoticeSheet: View {
-    var onConfirm: () -> Void
-
-    @Environment(\.palette) private var palette
-
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("本软件完全免费提供，不存在任何收费项目。")
-                    .font(.body)
-                    .foregroundStyle(palette.onSurface)
-
-                Text("如果你是通过付费方式获得本软件的，说明你被骗了，请向对方索要退款。")
-                    .font(.subheadline)
-                    .foregroundStyle(palette.primary)
-
-                Text("软件不会收取费用、不售卖卡密、不限制使用次数。")
-                    .font(.caption)
-                    .foregroundStyle(palette.onSurfaceVariant)
-
-                Spacer()
-            }
-            .padding(20)
-            .background(palette.background)
-            .navigationTitle("免费声明")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("我知道了") { onConfirm() }
-                }
-            }
-        }
-        .presentationDetents([.medium])
     }
 }
 

@@ -146,13 +146,27 @@ final class AppStore: ObservableObject {
     // MARK: - 读写
 
     private func load() {
-        if let d = prefs.data(forKey: Key.groups), let v = try? decoder.decode([AccountGroup].self, from: d) { groups = v }
-        if let d = prefs.data(forKey: Key.accounts), let v = try? decoder.decode([AccountItem].self, from: d) { accounts = v }
-        if let d = prefs.data(forKey: Key.scripts), let v = try? decoder.decode([UserScript].self, from: d) { scripts = v }
+        // 单字段解码失败时只丢掉该字段，其它字段不受影响 —— 旧版本升级
+        // 或导入安卓版数据时字段差异是常见的，单点失败不该把整个 AppStore 砸碎。
+        decodePref(Key.groups,    as: [AccountGroup].self) { self.groups  = $0 }
+        decodePref(Key.accounts,  as: [AccountItem].self)  { self.accounts = $0 }
+        decodePref(Key.scripts,   as: [UserScript].self)   { self.scripts  = $0 }
         let mw = prefs.integer(forKey: Key.maxWin)
         if mw > 0 { maxWindows = mw }
         tabMode = prefs.bool(forKey: Key.tabMode)
         darkTheme = prefs.object(forKey: Key.dark) == nil ? true : prefs.bool(forKey: Key.dark)
+    }
+
+    /// 解码 + 写入单字段：失败时记日志并清掉坏数据，下次启动不会再卡在同样位置
+    private func decodePref<T: Decodable>(_ key: String, as type: T.Type, setter: (T) -> Void) {
+        guard let d = prefs.data(forKey: key) else { return }
+        do {
+            setter(try decoder.decode(type, from: d))
+        } catch {
+            let name = (key as NSString).lastPathComponent
+            Log.store("持久化字段 " + name + " 解码失败，已清空: " + error.localizedDescription)
+            prefs.removeObject(forKey: key)
+        }
     }
 
     func save() {

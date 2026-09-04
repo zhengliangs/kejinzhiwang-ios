@@ -107,6 +107,8 @@ final class ImportViewModel: ObservableObject {
     private func handlePoll(_ result: QrPollResult) {
         switch result.state {
         case .confirmed:
+            // 防御：只有在等待扫码状态才进入登录流程，避免 pollTask 与按钮重复触发
+            guard stage == .qrWaiting else { return }
             qrHint = "授权成功，正在登录"
             qrImage = nil
             if let code = result.code { runLogin { try WxLogin.loginByWxCode(code) } }
@@ -176,7 +178,8 @@ final class ImportViewModel: ObservableObject {
         busy = true
         stage = .loggingIn
         message = ""
-        Task.detached(priority: .userInitiated) { [weak self] in
+        pollTask?.cancel()
+        pollTask = Task.detached(priority: .userInitiated) { [weak self] in
             do {
                 let login = try block()
                 await MainActor.run {
@@ -197,10 +200,13 @@ final class ImportViewModel: ObservableObject {
                     self.busy = false
                 }
             } catch {
+                // 把所有可能的错误都收敛到 import error，绝不让异常冒泡到 SwiftUI
+                let raw = error.localizedDescription
                 await MainActor.run {
                     self?.stage = .idle
-                    self?.message = error.localizedDescription
+                    self?.message = raw
                     self?.busy = false
+                    Log.importer("登录/查区服失败: " + raw)
                 }
             }
         }
