@@ -19,45 +19,56 @@ struct RootView: View {
     @State private var tab: AppTab = .accounts
     @State private var showImport = false
     @State private var update: ReleaseInfo?
+    // GamesView 平移用：通过 GeometryReader 取屏幕宽
+    @State private var screenWidth: CGFloat = UIScreen.main.bounds.width
 
     var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .bottom) {
-                TabView(selection: $tab) {
-                    NavigationStack {
-                        AccountsView(onOpenGame: { tab = .games },
-                                     onOpenImport: { showImport = true })
-                            .navigationTitle("账号管理")
-                            .navigationBarTitleDisplayMode(.inline)
-                    }
-                    .tabItem { Label("账号", systemImage: "person.2") }
-                    .tag(AppTab.accounts)
-
-                    NavigationStack {
-                        ScriptsView()
-                            .navigationTitle("脚本管理")
-                            .navigationBarTitleDisplayMode(.inline)
-                    }
-                    .tabItem { Label("脚本", systemImage: "curlybraces") }
-                    .tag(AppTab.scripts)
-
-                    NavigationStack {
-                        Color.clear
-                    }
-                    .tabItem { Label("游戏", systemImage: "gamecontroller") }
-                    .badge(store.windows.isEmpty ? 0 : store.windows.count)
-                    .tag(AppTab.games)
+        // 关键：不要再用 GeometryReader 包整个 body —— 那会让 fullScreenCover
+        // 的容器被 GeometryReader 的 size proposal 限制为 TabView 的可见区，
+        // 导致 ImportView 看起来"悬浮在中间、底部 TabBar 还能看到"。
+        // 这里把 GeometryReader 拆出去，只裹真正需要 geo 的 GamesView 平移层。
+        ZStack(alignment: .bottom) {
+            TabView(selection: $tab) {
+                NavigationStack {
+                    AccountsView(onOpenGame: { tab = .games },
+                                 onOpenImport: { showImport = true })
+                        .navigationTitle("账号管理")
+                        .navigationBarTitleDisplayMode(.inline)
                 }
+                .tabItem { Label("账号", systemImage: "person.2") }
+                .tag(AppTab.accounts)
 
-                // 游戏层常驻
-                GamesView()
-                    .background(palette.background)
-                    .padding(.bottom, bottomInset(geo))
-                    .offset(x: tab == .games ? 0 : geo.size.width * 2)
-                    .allowsHitTesting(tab == .games)
+                NavigationStack {
+                    ScriptsView()
+                        .navigationTitle("脚本管理")
+                        .navigationBarTitleDisplayMode(.inline)
+                }
+                .tabItem { Label("脚本", systemImage: "curlybraces") }
+                .tag(AppTab.scripts)
+
+                NavigationStack {
+                    Color.clear
+                }
+                .tabItem { Label("游戏", systemImage: "gamecontroller") }
+                .badge(store.windows.isEmpty ? 0 : store.windows.count)
+                .tag(AppTab.games)
             }
+
+            // 游戏层常驻 —— 用容器相对 frame 放到 TabBar 之上
+            GamesView()
+                .background(palette.background)
+                .padding(.bottom, tabBarHeight)
+                .offset(x: tab == .games ? 0 : screenWidth * 2)
+                .allowsHitTesting(tab == .games)
+                // GeometryReader 只裹这一处：拿到 width 用来平移
+                .background(GeometryReader { geo in
+                    Color.clear
+                        .onAppear { screenWidth = geo.size.width }
+                        .onChange(of: geo.size.width) { screenWidth = $0 }
+                })
         }
         .tint(palette.primary)
+        // fullScreenCover 直接挂在 ZStack 上：保证是真正的全屏覆盖
         .fullScreenCover(isPresented: $showImport) {
             ImportView { showImport = false }
                 .environmentObject(store)
@@ -74,9 +85,11 @@ struct RootView: View {
         }
     }
 
-    /// 给底栏让出的高度（标准 49pt + 安全区）
-    private func bottomInset(_ geo: GeometryProxy) -> CGFloat {
-        49 + geo.safeAreaInsets.bottom
+    /// TabBar 的高度（标准 49pt + 底部安全区）
+    private var tabBarHeight: CGFloat {
+        49 + UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.windows.first?.safeAreaInsets.bottom }
+            .first ?? 0
     }
 }
 

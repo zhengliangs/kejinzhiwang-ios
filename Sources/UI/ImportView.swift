@@ -113,18 +113,30 @@ struct ImportView: View {
             // SwiftUI fileImporter 回调永远是 [URL]（无论是否多选），取首个
             switch result {
             case .success(let urls):
+                Log.importer("[fileImporter-query] success, urls.count=" + String(urls.count))
                 guard let url = urls.first else {
+                    Log.importer("[fileImporter-query] urls 为空")
                     vm.message = "未选择文件"
                     return
                 }
+                Log.importer("[fileImporter-query] 选中 url=" + url.absoluteString)
                 let accessed = url.startAccessingSecurityScopedResource()
+                Log.importer("[fileImporter-query] startAccessing=" + String(accessed))
                 defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-                guard let data = try? Data(contentsOf: url), !data.isEmpty else {
-                    vm.message = "文件读取失败"
-                    return
+                do {
+                    let data = try Data(contentsOf: url)
+                    Log.importer("[fileImporter-query] 读取字节数=" + String(data.count))
+                    guard !data.isEmpty else {
+                        vm.message = "文件为空"
+                        return
+                    }
+                    vm.queryFromBin(data)
+                } catch {
+                    Log.importer("[fileImporter-query] 读取失败: " + error.localizedDescription)
+                    vm.message = "文件读取失败：" + error.localizedDescription
                 }
-                vm.queryFromBin(data)
             case .failure(let err):
+                Log.importer("[fileImporter-query] 用户取消/失败: " + err.localizedDescription)
                 vm.message = "未选择文件：" + err.localizedDescription
             }
         }
@@ -133,17 +145,33 @@ struct ImportView: View {
                       allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls) where !urls.isEmpty:
+                Log.importer("[fileImporter-direct] success, urls.count=" + String(urls.count))
                 var n = 0
                 for url in urls {
+                    Log.importer("[fileImporter-direct] 处理 url=" + url.lastPathComponent)
                     let accessed = url.startAccessingSecurityScopedResource()
+                    Log.importer("[fileImporter-direct] startAccessing=" + String(accessed))
                     defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-                    guard url.lastPathComponent.lowercased().hasSuffix(".bin") else { continue }
-                    guard let data = try? Data(contentsOf: url) else { continue }
-                    store.addAccount(name: url.lastPathComponent, data: data)
-                    n += 1
+                    guard url.lastPathComponent.lowercased().hasSuffix(".bin") else {
+                        Log.importer("[fileImporter-direct] 跳过非 .bin: " + url.lastPathComponent)
+                        continue
+                    }
+                    do {
+                        let data = try Data(contentsOf: url)
+                        Log.importer("[fileImporter-direct] 读取字节=" + String(data.count))
+                        store.addAccount(name: url.lastPathComponent, data: data)
+                        n += 1
+                    } catch {
+                        Log.importer("[fileImporter-direct] 读取失败: " + error.localizedDescription)
+                    }
                 }
+                Log.importer("[fileImporter-direct] 成功导入=" + String(n))
                 if n > 0 { imported = n } else { vm.message = "文件读取失败" }
-            default:
+            case .success(let urls):
+                Log.importer("[fileImporter-direct] success 但未选 urls")
+                vm.message = "没有选择文件"
+            case .failure(let err):
+                Log.importer("[fileImporter-direct] 取消/失败: " + err.localizedDescription)
                 vm.message = "没有选择文件"
             }
         }
