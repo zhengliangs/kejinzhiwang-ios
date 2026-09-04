@@ -32,3 +32,6 @@ xcuserdata/
 Thumbs.db
 *.swp
 *~
+
+# 本地诊断日志（构建日志下载产物）
+run.log
