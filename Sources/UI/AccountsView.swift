@@ -37,9 +37,14 @@ struct AccountsView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            content
-            TipHost(tip: tip, topPadding: 8)
+        VStack(spacing: 0) {
+            // 屏幕适配自检：兼容模式下会变成醒目的一条，用来区分
+            // 「系统把 App 缩进了 4.7 寸画布」和「App 内部布局没铺满」
+            ScreenDiag()
+            ZStack(alignment: .top) {
+                content
+                TipHost(tip: tip, topPadding: 8)
+            }
         }
         .background(palette.background)
     }

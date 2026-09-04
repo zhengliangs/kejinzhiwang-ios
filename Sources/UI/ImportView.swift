@@ -230,42 +230,30 @@ private struct BinPane: View {
     @Environment(\.palette) private var palette
     @EnvironmentObject private var store: AppStore
 
-    // UIKit 版整机文件选择器（能浏览整个「文件 App」，bin 放哪都能选到）
-    @State private var showUIKitQuery = false   // 单选：反查
-    @State private var showUIKitDirect = false  // 多选：直接导入
-    // 内置沙盒扫描器（bin 已在氪金之王目录时可用）
-    @State private var showLocalQueryPicker = false
-    @State private var showLocalDirectPicker = false
+    // 入口回到系统文件选择器（.fileImporter），跟改版前一模一样。
+    @State private var showQueryPicker = false    // 单选：选完反查区服
+    @State private var showDirectPicker = false   // 多选：直接导入
+    // 备用入口：同样是系统的文件 App，只是走 UIKit 那条路。正常用不到，
+    // 留在这是为了上面两个万一调不出来时不至于彻底卡死。
+    @State private var showFallbackPicker = false
 
     var body: some View {
         VStack(spacing: 10) {
 
-            // ====== 第一入口：浏览整个「文件 App」（推荐，最省事）=====
             Button {
-                vm.diag("[0] 打开整机文件选择器（单选·反查）")
-                showUIKitQuery = true
+                vm.diag("[0] 打开文件选择器（单选·反查）")
+                showQueryPicker = true
             } label: {
                 HStack(spacing: 6) {
                     if vm.busy { ProgressView() }
                     Image(systemName: "doc.badge.plus")
-                    Text("从整个「文件 App」选一个 bin")
+                    Text("选一个 bin（反查区服）")
                 }
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .disabled(vm.busy)
-            Text("会弹出文件选择器，bin 在 iCloud / 下载 / 微信存的文件里都能直接选，不用提前放到 App 目录。选中后自动反查区服。")
-                .font(.caption)
-                .foregroundStyle(palette.onSurfaceVariant)
-
-            Spacer().frame(height: 16)
-            Divider()
-            Spacer().frame(height: 16)
-
-            Button("从「文件 App」批量添加 bin（直接导入）") { showUIKitDirect = true }
-                .buttonStyle(.bordered)
-                .disabled(vm.busy)
-            Text("不反查，原样导入多份 bin。")
+            Text("选好后自动解析这份 bin，查出该账号下所有区服的角色，勾选确认再导入。")
                 .font(.caption)
                 .foregroundStyle(palette.onSurfaceVariant)
 
@@ -273,37 +261,36 @@ private struct BinPane: View {
             Divider()
             Spacer().frame(height: 14)
 
-            // ====== 第二入口：从氪金之王自己的目录选（bin 已放进沙盒时）======
-            HStack {
-                Button {
-                    vm.diag("[0] 打开本地 bin 选择器（单选）")
-                    showLocalQueryPicker = true
-                } label: {
-                    Image(systemName: "folder")
-                    Text("氪金之王目录·单选")
+            Button {
+                vm.diag("[0] 打开文件选择器（多选·直接导入）")
+                showDirectPicker = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "doc.on.doc")
+                    Text("选择多个 bin 直接导入")
                 }
-                .font(.subheadline)
-                .buttonStyle(.bordered)
-
-                Button {
-                    vm.diag("[0] 打开本地 bin 选择器（多选）")
-                    showLocalDirectPicker = true
-                } label: {
-                    Image(systemName: "folder")
-                    Text("氪金之王目录·多选")
-                }
-                .font(.subheadline)
-                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
             }
-            Text("仅当 bin 已拷进「文件App → 我的iPhone → 氪金之王」目录时，这里的列表才有内容。")
-                .font(.caption2)
+            .buttonStyle(.bordered)
+            .disabled(vm.busy)
+            Text("不反查区服，按文件原样导入。")
+                .font(.caption)
                 .foregroundStyle(palette.onSurfaceVariant)
+
+            Spacer().frame(height: 12)
+
+            Button("备用：用系统文件 App 选择") {
+                vm.diag("[0] 打开备用选择器")
+                showFallbackPicker = true
+            }
+            .font(.caption)
+            .foregroundStyle(palette.onSurfaceVariant)
 
             // —— 诊断日志：界面上直接显示每一步，方便截图反馈问题 ——
             if !vm.diagLog.isEmpty {
                 Divider()
                 HStack {
-                    Text("操作日志（也写入 import.log）")
+                    Text("操作日志")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(palette.onSurfaceVariant)
                     Spacer()
@@ -328,86 +315,113 @@ private struct BinPane: View {
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-        // ===== UIKit 整机文件选择器 =====
-        // 单选：用 asCopy=true，系统把文件拷到 App Inbox 后回调 URL
-        .sheet(isPresented: $showUIKitQuery) {
-            UIKitDocumentPicker(allowsMultiple: false) { urls in
-                vm.diag("[0] 整机选择器回调，urls=" + String(urls.count))
+        // 单选：拿 bin 去反查区服
+        .fileImporter(isPresented: $showQueryPicker,
+                      allowedContentTypes: [.data],
+                      allowsMultipleSelection: false) { result in
+            switch result {
+            case .success(let urls):
+                vm.diag("[0] 单选回调 urls=" + String(urls.count))
                 guard let url = urls.first else {
-                    vm.diag("[0] 用户取消，未选文件")
+                    vm.diag("[0] 回调成功但没有 URL")
+                    vm.message = "没拿到文件，换备用入口试试"
                     return
                 }
-                vm.diag("[0] 选中(拷贝后): " + url.lastPathComponent)
                 loadAndQuery(url)
+            case .failure(let err):
+                vm.diag("[0] 选择失败: " + err.localizedDescription)
+                vm.message = "选择失败：" + err.localizedDescription
             }
         }
-        // 多选：直接导入
-        .sheet(isPresented: $showUIKitDirect) {
-            UIKitDocumentPicker(allowsMultiple: true) { urls in
-                vm.diag("[0] 整机选择器回调（多选），urls=" + String(urls.count))
-                var n = 0
-                for url in urls {
-                    vm.diag("[0] 处理: " + url.lastPathComponent)
-                    guard url.lastPathComponent.lowercased().hasSuffix(".bin") else {
-                        vm.diag("[1] 跳过非 .bin: " + url.lastPathComponent)
-                        continue
-                    }
-                    guard let data = try? Data(contentsOf: url) else {
-                        vm.diag("[1] 读取失败: " + url.lastPathComponent)
-                        continue
-                    }
-                    vm.diag("[1] 读取字节=" + String(data.count))
-                    store.addAccount(name: url.lastPathComponent, data: data)
-                    n += 1
+        // 多选：原样导入
+        .fileImporter(isPresented: $showDirectPicker,
+                      allowedContentTypes: [.data],
+                      allowsMultipleSelection: true) { result in
+            switch result {
+            case .success(let urls):
+                vm.diag("[0] 多选回调 urls=" + String(urls.count))
+                importMany(urls)
+            case .failure(let err):
+                vm.diag("[0] 选择失败: " + err.localizedDescription)
+                vm.message = "选择失败：" + err.localizedDescription
+            }
+        }
+        // 备用入口
+        .sheet(isPresented: $showFallbackPicker) {
+            UIKitDocumentPicker(allowsMultiple: false) { urls in
+                vm.diag("[0] 备用选择器回调 urls=" + String(urls.count))
+                guard let url = urls.first else {
+                    vm.diag("[0] 用户取消")
+                    return
                 }
-                vm.diag("[0] 成功导入=" + String(n))
-                if n > 0 { onImported(n) } else { vm.message = "没有可导入的 bin 文件" }
-            }
-        }
-        // 内置沙盒扫描器：单选（反查）
-        .sheet(isPresented: $showLocalQueryPicker) {
-            LocalBinPicker(title: "选一个 bin", multiSelect: false) { picked in
-                guard let file = picked.first else { return }
-                vm.diag("[0] 本地选择: " + file.url.lastPathComponent)
-                loadAndQuery(file.url)
-            }
-        }
-        // 内置沙盒扫描器：多选（直接导入）
-        .sheet(isPresented: $showLocalDirectPicker) {
-            LocalBinPicker(title: "选 bin 文件（可多选）", multiSelect: true) { picked in
-                vm.diag("[0] 本地批量选择: " + String(picked.count) + " 个")
-                var n = 0
-                for file in picked {
-                    guard let data = try? Data(contentsOf: file.url) else {
-                        vm.diag("[1] 读取失败: " + file.url.lastPathComponent)
-                        continue
-                    }
-                    vm.diag("[1] 读取字节=" + String(data.count) + " " + file.url.lastPathComponent)
-                    store.addAccount(name: file.url.lastPathComponent, data: data)
-                    n += 1
-                }
-                vm.diag("[0] 成功导入=" + String(n))
-                if n > 0 { onImported(n) } else { vm.message = "文件读取失败" }
+                loadAndQuery(url)
             }
         }
     }
 
-    private func loadAndQuery(_ url: URL) {
-        vm.diag("[0] 单选回调: " + url.lastPathComponent)
+    /**
+     * 读取选中的文件。
+     *
+     * 这里补的是之前「选好了点打开却毫无反应」的真正原因：
+     * SwiftUI 的 fileImporter 给的是**原文件**的安全作用域 URL，不是拷贝件。
+     * 不先 startAccessingSecurityScopedResource() 就读，系统会直接拒绝，
+     * Data(contentsOf:) 抛权限错误 —— 错误被吞掉，界面上就一点动静都没有。
+     */
+    private func readFile(_ url: URL) -> Data? {
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+        vm.diag("[1] 授权=" + (accessed ? "已取得" : "无需/失败") + " · " + url.lastPathComponent)
+
+        if let data = try? Data(contentsOf: url), !data.isEmpty {
+            vm.diag("[1] 直读成功 字节=" + String(data.count))
+            return data
+        }
+        // 直读失败多半是 iCloud 上的文件还没下载下来。
+        // 复制到本地临时目录会强制触发下载。
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + "-" + url.lastPathComponent)
+        defer { try? FileManager.default.removeItem(at: tmp) }
         do {
-            let data = try Data(contentsOf: url)
-            vm.diag("[1] 读取字节数=" + String(data.count))
-            guard !data.isEmpty else {
-                vm.message = "文件为空"
-                return
-            }
-            vm.queryFromBin(data)
+            try FileManager.default.copyItem(at: url, to: tmp)
+            let data = try Data(contentsOf: tmp)
+            vm.diag("[1] 复制后读取成功 字节=" + String(data.count))
+            return data
         } catch {
             vm.diag("[1] 读取失败: " + error.localizedDescription)
-            vm.message = "文件读取失败：" + error.localizedDescription
+            return nil
+        }
+    }
+
+    private func loadAndQuery(_ url: URL) {
+        vm.diag("[0] 选中: " + url.lastPathComponent)
+        guard let data = readFile(url) else {
+            vm.message = "文件读不出来，看下面日志"
+            return
+        }
+        vm.diag("[2] 开始反查 字节=" + String(data.count))
+        vm.queryFromBin(data)
+    }
+
+    private func importMany(_ urls: [URL]) {
+        var n = 0
+        for url in urls {
+            guard url.lastPathComponent.lowercased().hasSuffix(".bin") else {
+                vm.diag("[1] 跳过非 bin: " + url.lastPathComponent)
+                continue
+            }
+            guard let data = readFile(url) else { continue }
+            store.addAccount(name: url.deletingPathExtension().lastPathComponent, data: data)
+            n += 1
+        }
+        vm.diag("[0] 成功导入=" + String(n))
+        if n > 0 {
+            onImported(n)
+        } else {
+            vm.message = "没有可导入的 bin 文件"
         }
     }
 }
+
 
 // MARK: - 角色选择
 

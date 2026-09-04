@@ -29,6 +29,13 @@
 		<key>UIColorName</key>
 		<string>LaunchBackground</string>
 	</dict>
+	<!-- 真正的 LaunchScreen.storyboard。
+	     只有 Info.plist 里的 UILaunchScreen 时，部分设备/部分重签名工具下
+	     系统判定 App 没有为这块屏幕提供启动图，于是以「兼容模式」渲染：
+	     画面被框在 4.7 寸的画布里再整体缩放居中，表现就是上下两条黑边。
+	     提供标准的 launch storyboard 后系统才会按设备的真实分辨率渲染。 -->
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

@@ -44,6 +44,11 @@ targets:
         buildPhase: resources
       - path: Resources/Assets.xcassets
         buildPhase: resources
+      # 启动图。必须是真正的 storyboard：只靠 Info.plist 的 UILaunchScreen
+      # 在部分机型上会被系统判为「未适配该屏幕」，App 于是跑在兼容模式下
+      # （4.7 寸画布居中 + 上下黑边）。
+      - path: Resources/LaunchScreen.storyboard
+        buildPhase: resources
     info:
       path: Resources/Info.plist
     settings:
