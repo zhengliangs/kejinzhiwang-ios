@@ -160,12 +160,13 @@ enum Gzip {
             if total == out.count {
                 out.append(contentsOf: [UInt8](repeating: 0, count: out.count))
             }
+            let avail = out.count - total  // 排他访问：out.count 提到闭包外
             let written = out.withUnsafeMutableBufferPointer { buf -> Int in
                 stream.next_out = buf.baseAddress!.advanced(by: total)
-                stream.avail_out = uInt(out.count - total)
+                stream.avail_out = uInt(avail)
                 let rc = inflate(&stream, Z_NO_FLUSH)
                 if rc != Z_OK && rc != Z_STREAM_END && rc != Z_BUF_ERROR { return -1 }
-                return Int(out.count - total) - Int(stream.avail_out)
+                return avail - Int(stream.avail_out)
             }
             if written < 0 { return nil }
             total += written
