@@ -228,7 +228,7 @@ enum WxLogin {
     private static func combLogin(_ device: DeviceInfo, _ payload: JsonObject) throws -> LoginResult {
         // 请求体不是明文 JSON：先 base64、再用服务端下发的码本 XOR、再 base64。
         // 直接发明文会被判「解密错误 errCode=10024」。
-        let plain = payload.toJsonString()
+        let plain = try payload.toJsonString()
         let rule = try fetchCryptRule(device)
         let body = CodeBookCrypto.encrypt(plain, rule)
         Log.importer("登录请求体 明文\(plain.count)字符 → 密文\(body.count)字符")

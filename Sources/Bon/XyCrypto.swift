@@ -62,16 +62,18 @@ enum XyCrypto {
 
         out[0] = 0x70
         out[1] = 0x78
-        out[2] = UInt8((0xAA & Int(out[2])) |
-            (((key >> 7) & 1) << 6) |
-            (((key >> 6) & 1) << 4) |
-            (((key >> 5) & 1) << 2) |
-            (((key >> 4) & 1) << 0))
-        out[3] = UInt8((0xAA & Int(out[3])) |
-            (((key >> 3) & 1) << 6) |
-            (((key >> 2) & 1) << 4) |
-            (((key >> 1) & 1) << 2) |
-            (((key >> 0) & 1) << 0))
+        let v2 = (0xAA & Int(out[2]))
+            | (((key >> 7) & 1) << 6)
+            | (((key >> 6) & 1) << 4)
+            | (((key >> 5) & 1) << 2)
+            | (((key >> 4) & 1) << 0)
+        out[2] = UInt8(truncatingIfNeeded: v2)
+        let v3 = (0xAA & Int(out[3]))
+            | (((key >> 3) & 1) << 6)
+            | (((key >> 2) & 1) << 4)
+            | (((key >> 1) & 1) << 2)
+            | (((key >> 0) & 1) << 0)
+        out[3] = UInt8(truncatingIfNeeded: v3)
         return out
     }
 
