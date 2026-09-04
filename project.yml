@@ -24,7 +24,7 @@ settings:
     CURRENT_PROJECT_VERSION: "99"
     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     SWIFT_EMIT_LOC_STRINGS: YES
-    EXCLUDED_ARCHS[sdk=iphonesimulator*]: arm64
+    "EXCLUDED_ARCHS[sdk=iphonesimulator*]": arm64
 
 targets:
   KejinZhiWang:
